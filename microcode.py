@@ -6,7 +6,8 @@
 import sys
 import argparse
 
-def assign(mem, addr, data):
+def set_instruction(mem, opcode, data):
+    addr = opcode << 3
     mem[addr:(addr+len(data))] = data
 
 HLT = 1 << 0   # stop the clock
@@ -41,23 +42,29 @@ instruction_size = 8
 eeprom_size = 2048
 microcode = (eeprom_size//instruction_size)*instructions['NOP']
 
-# opcodes 00, 08, 10, 18, 20, 28, ..., f0, f8
-assign(microcode, 0x00, instructions['NOP'])
+## Set the instructions
+# opcodes 00, 01, 02, 03, ..., 0f, 10, 11, ..., 1e, 1f
+
+# NOP
+set_instruction(microcode, 0x00, instructions['NOP'])
+
 # LDA, LDB
-assign(microcode, 0x08, instructions['LDA(c)'])
-# assign(microcode, 0x08, instructions['LDA(i)'])
-# assign(microcode, 0x08, instructions['LDA(a)'])
-assign(microcode, 0x10, instructions['LDB(c)'])
-# assign(microcode, 0x10, instructions['LDB(i)'])
-# assign(microcode, 0x10, instructions['LDB(a)'])
-assign(microcode, 0x40, instructions['ADD'])
-# assign(microcode, 0x48, instructions['SUB'])
-assign(microcode, 0x50, instructions['OUT'])
-assign(microcode, 0x60, instructions['JMP(c)'])
+set_instruction(microcode, 0x01, instructions['LDA(c)'])
+set_instruction(microcode, 0x02, instructions['LDB(c)'])
 
-assign(microcode, 0xf8, instructions['HLT'])
+# ADD
+set_instruction(microcode, 0x08, instructions['ADD'])
 
-# microcode[0xf8:(0xf8+8)] = instructions['HLT']
+# OUTPUT
+set_instruction(microcode, 0x0a, instructions['OUT'])
+
+# JUMP, BRANCH
+set_instruction(microcode, 0x0b, instructions['JMP(c)'])
+
+# HLT
+set_instruction(microcode, 0x1f, instructions['HLT'])
+
+
 
 def format_code(c):
 
@@ -78,9 +85,10 @@ if __name__ == '__main__':
     if args.mode == 'table':
         print("flags op    {}".format('\t'.join(('T'+str(i)).ljust(code_width) for i in range(6))))
         for row in range(len(microcode)//8):
-            opcode = (row*8) & 0xf8
-            flags  = ((row*8) & 0x700) >> 8
-            print('  {:03b} {:02x}    {}'.format(flags, opcode,'\t'.join(format_code(c) for c in microcode[(row*8):(row*8+6)])))
+            addr = row*8
+            opcode = row & 0x1f
+            flags  = ((addr) & 0x700) >> 8
+            print('  {:03b} {:02x}    {}'.format(flags, opcode,'\t'.join(format_code(c) for c in microcode[addr:(addr+6)])))
     elif args.mode == 'low':
         microcode_low  = [c & 0xff for c in microcode]
         sys.stdout.buffer.write(bytes(microcode_low))
