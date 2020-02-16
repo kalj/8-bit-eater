@@ -25,24 +25,24 @@ OUT = 1 << 11  # output register in
 PCE = 1 << 12  # program counter enable
 PCO = 1 << 13  # program counter out
 PCI = 1 << 14  # program counter in
-UKN = 1 << 15  # nothing
+MIE = 1 << 15  # micro instruction end
 
 instructions = {}
 #                              T0              T1            T2             T3             T4      T5  .  .
-instructions['NOP']    = [PCO|MAI,    MDO|IRI|PCE,            0,             0,             0,      0, 0, 0]
+instructions['NOP']    = [PCO|MAI,    MDO|IRI|PCE,            0,           MIE,             0,      0, 0, 0]
 instructions['HLT']    = [PCO|MAI,    MDO|IRI|PCE,          HLT,             0,             0,      0, 0, 0]
-instructions['LDA(c)'] = [PCO|MAI,    MDO|IRI|PCE,      IMO|ARI,             0,             0,      0, 0, 0]
-instructions['LDB(c)'] = [PCO|MAI,    MDO|IRI|PCE,      IMO|BRI,             0,             0,      0, 0, 0]
-instructions['LDA(i)'] = [PCO|MAI,    MDO|IRI|PCE,      PCO|MAI,   MDO|ARI|PCE,             0,      0, 0, 0]
-instructions['LDB(i)'] = [PCO|MAI,    MDO|IRI|PCE,      PCO|MAI,   MDO|BRI|PCE,             0,      0, 0, 0]
-instructions['LDA(a)'] = [PCO|MAI,    MDO|IRI|PCE,      PCO|MAI,   MDO|MAI|PCE,   MDO|ARI|PCE,      0, 0, 0]
-instructions['LDB(a)'] = [PCO|MAI,    MDO|IRI|PCE,      PCO|MAI,   MDO|MAI|PCE,   MDO|BRI|PCE,      0, 0, 0]
-instructions['STA(a)'] = [PCO|MAI,    MDO|IRI|PCE,      PCO|MAI,   MDO|MAI|PCE,   MDI|ARO|PCE,      0, 0, 0]
-instructions['ADD']    = [PCO|MAI,    MDO|IRI|PCE,      ARI|ALU,             0,             0,      0, 0, 0]
-instructions['SUB']    = [PCO|MAI,    MDO|IRI|PCE,  ARI|ALU|SUB,             0,             0,      0, 0, 0]
-instructions['OUT']    = [PCO|MAI,    MDO|IRI|PCE,      ARO|OUT,             0,             0,      0, 0, 0]
-instructions['JMP(c)'] = [PCO|MAI,    MDO|IRI|PCE,      IMO|PCI,             0,             0,      0, 0, 0]
-instructions['JMP(i)'] = [PCO|MAI,    MDO|IRI|PCE,      PCO|MAI,       MDO|PCI,             0,      0, 0, 0]
+instructions['LDA(c)'] = [PCO|MAI,    MDO|IRI|PCE,      IMO|ARI,           MIE,             0,      0, 0, 0]
+instructions['LDB(c)'] = [PCO|MAI,    MDO|IRI|PCE,      IMO|BRI,           MIE,             0,      0, 0, 0]
+instructions['LDA(i)'] = [PCO|MAI,    MDO|IRI|PCE,      PCO|MAI,   MDO|ARI|PCE,           MIE,      0, 0, 0]
+instructions['LDB(i)'] = [PCO|MAI,    MDO|IRI|PCE,      PCO|MAI,   MDO|BRI|PCE,           MIE,      0, 0, 0]
+instructions['LDA(a)'] = [PCO|MAI,    MDO|IRI|PCE,      PCO|MAI,   MDO|MAI|PCE,   MDO|ARI|PCE,    MIE, 0, 0]
+instructions['LDB(a)'] = [PCO|MAI,    MDO|IRI|PCE,      PCO|MAI,   MDO|MAI|PCE,   MDO|BRI|PCE,    MIE, 0, 0]
+instructions['STA(a)'] = [PCO|MAI,    MDO|IRI|PCE,      PCO|MAI,   MDO|MAI|PCE,   MDI|ARO|PCE,    MIE, 0, 0]
+instructions['ADD']    = [PCO|MAI,    MDO|IRI|PCE,      ARI|ALU,           MIE,             0,      0, 0, 0]
+instructions['SUB']    = [PCO|MAI,    MDO|IRI|PCE,  ARI|ALU|SUB,           MIE,             0,      0, 0, 0]
+instructions['OUT']    = [PCO|MAI,    MDO|IRI|PCE,      ARO|OUT,           MIE,             0,      0, 0, 0]
+instructions['JMP(c)'] = [PCO|MAI,    MDO|IRI|PCE,      IMO|PCI,           MIE,             0,      0, 0, 0]
+instructions['JMP(i)'] = [PCO|MAI,    MDO|IRI|PCE,      PCO|MAI,       MDO|PCI,           MIE,      0, 0, 0]
 
 
 instruction_size = 8
