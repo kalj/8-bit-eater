@@ -54,6 +54,11 @@ class Microcode:
             assert(len(zf_ops) > 0 and len(zf_ops) <= 4)
             instruction['zf_micro_ops'] = zf_ops
 
+        elif 'nf_ops' in kwargs:
+            nf_ops = kwargs['nf_ops']
+            assert(len(nf_ops) > 0 and len(nf_ops) <= 4)
+            instruction['nf_micro_ops'] = nf_ops
+
         self.instructions.append(instruction)
 
     def _format_micro_ops(self,micro_ops, inc_fetcyc):
@@ -75,14 +80,18 @@ class Microcode:
             mnemonic = instr['mnemonic']
             micro_ops = instr['micro_ops']
 
-            if 'zf_micro_ops' in instr:
-                zf_ops = instr['zf_micro_ops']
-                print(' {:02x}  {}   {}  {}'.format(opcode, mnemonic.ljust(mnem_width), '*0*', self._format_micro_ops(micro_ops, include_fetch_cycles)))
-                print('              {}  {}'.format('*1*', self._format_micro_ops(zf_ops, include_fetch_cycles)))
-            elif 'cf_micro_ops' in instr:
+            if 'cf_micro_ops' in instr:
                 cf_ops = instr['cf_micro_ops']
                 print(' {:02x}  {}   {}  {}'.format(opcode, mnemonic.ljust(mnem_width), '**0', self._format_micro_ops(micro_ops, include_fetch_cycles)))
                 print('              {}  {}'.format('**1', self._format_micro_ops(cf_ops, include_fetch_cycles)))
+            elif 'zf_micro_ops' in instr:
+                zf_ops = instr['zf_micro_ops']
+                print(' {:02x}  {}   {}  {}'.format(opcode, mnemonic.ljust(mnem_width), '*0*', self._format_micro_ops(micro_ops, include_fetch_cycles)))
+                print('              {}  {}'.format('*1*', self._format_micro_ops(zf_ops, include_fetch_cycles)))
+            elif 'nf_micro_ops' in instr:
+                nf_ops = instr['nf_micro_ops']
+                print(' {:02x}  {}   {}  {}'.format(opcode, mnemonic.ljust(mnem_width), '0**', self._format_micro_ops(micro_ops, include_fetch_cycles)))
+                print('              {}  {}'.format('1**', self._format_micro_ops(nf_ops, include_fetch_cycles)))
             else:
                 print(' {:02x}  {}   {}  {}'.format(opcode, mnemonic.ljust(mnem_width), '***', self._format_micro_ops(micro_ops, include_fetch_cycles)))
 
@@ -116,6 +125,8 @@ class Microcode:
                     micro_ops = instr['cf_micro_ops']
                 elif flags & 2 and 'zf_micro_ops' in instr:
                     micro_ops = instr['zf_micro_ops']
+                elif flags & 4 and 'nf_micro_ops' in instr:
+                    micro_ops = instr['nf_micro_ops']
 
                 micro_ops = self.fetch_cycles+micro_ops
                 blob[addr:(addr+len(micro_ops))] = micro_ops
@@ -161,6 +172,8 @@ if __name__ == '__main__':
     microcode.push(0x0e, 'BRC(i)', [           0,           MIE,             0,      0], cf_ops = [     PCO|MAI,       MDO|PCI,           MIE,      0])
     microcode.push(0x0f, 'BRZ(c)', [           0,           MIE,             0,      0], zf_ops = [     IMO|PCI,           MIE,             0,      0])
     microcode.push(0x10, 'BRZ(i)', [           0,           MIE,             0,      0], zf_ops = [     PCO|MAI,       MDO|PCI,           MIE,      0])
+    microcode.push(0x11, 'BRN(c)', [           0,           MIE,             0,      0], nf_ops = [     IMO|PCI,           MIE,             0,      0])
+    microcode.push(0x12, 'BRN(i)', [           0,           MIE,             0,      0], nf_ops = [     PCO|MAI,       MDO|PCI,           MIE,      0])
 
     # HLT                                     T2             T3             T4      T5
     microcode.push(0x1f, 'HLT',    [         HLT,             0,             0,      0])
