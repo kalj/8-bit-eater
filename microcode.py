@@ -29,44 +29,52 @@ def format_code(c):
     return low+' '+high
     # return '{:04x}'.format(c)
 
+def add_conditional_uops(instruction, kwargs):
+    if 'cf_uops' in kwargs:
+        cf_uops = kwargs['cf_uops']
+        assert(len(cf_uops) > 0 and len(cf_uops) <= 4)
+        instruction['cf_uops'] = cf_uops
+
+    elif 'zf_uops' in kwargs:
+        zf_uops = kwargs['zf_uops']
+        assert(len(zf_uops) > 0 and len(zf_uops) <= 4)
+        instruction['zf_uops'] = zf_uops
+
+    elif 'nf_uops' in kwargs:
+        nf_uops = kwargs['nf_uops']
+        assert(len(nf_uops) > 0 and len(nf_uops) <= 4)
+        instruction['nf_uops'] = nf_uops
+
 class Microcode:
     def __init__(self, fetch_cycles):
         self.instructions = []
         self.fetch_cycles = fetch_cycles
+        self.default_instruction = None
 
-    def push(self, opcode, mnemonic, micro_ops, **kwargs):
+    def set_default(self, mnemonic, uops, **kwargs):
+        self.default_instruction = {'mnemonic':mnemonic, 'uops':uops}
+        add_conditional_uops(self.default_instruction, kwargs)
+
+    def push(self, opcode, mnemonic, uops, **kwargs):
         matches = [i for i in self.instructions if mnemonic == i['mnemonic'] or opcode==i['opcode']]
 
         if len(matches) > 0:
             raise Exception("Cannot add instruction with mnemonic {}, and opcode {}. Conflicts with existing instruction(s): {}".format(mnemonic, opcode, matches))
 
-        assert(len(micro_ops) > 0 and len(micro_ops) <= 4)
+        assert(len(uops) > 0 and len(uops) <= 4)
 
-        instruction = {'mnemonic':mnemonic, 'opcode':opcode, 'micro_ops':micro_ops}
+        instruction = {'mnemonic':mnemonic, 'opcode':opcode, 'uops':uops}
 
-        if 'cf_ops' in kwargs:
-            cf_ops = kwargs['cf_ops']
-            assert(len(cf_ops) > 0 and len(cf_ops) <= 4)
-            instruction['cf_micro_ops'] = cf_ops
-
-        elif 'zf_ops' in kwargs:
-            zf_ops = kwargs['zf_ops']
-            assert(len(zf_ops) > 0 and len(zf_ops) <= 4)
-            instruction['zf_micro_ops'] = zf_ops
-
-        elif 'nf_ops' in kwargs:
-            nf_ops = kwargs['nf_ops']
-            assert(len(nf_ops) > 0 and len(nf_ops) <= 4)
-            instruction['nf_micro_ops'] = nf_ops
+        add_conditional_uops(instruction,kwargs)
 
         self.instructions.append(instruction)
 
-    def _format_micro_ops(self,micro_ops, inc_fetcyc):
+    def _format_uops(self,uops, inc_fetcyc):
         if inc_fetcyc:
-            micro_ops = self.fetch_cycles+micro_ops
-        return '   '.join(format_code(c) for c in micro_ops)
+            uops = self.fetch_cycles+uops
+        return '   '.join(format_code(c) for c in uops)
 
-    def print_uctable(self, include_fetch_cycles=True):
+    def print_uctable(self, print_default=False, include_fetch_cycles=True):
         code_width = len(format_code(0))
         mnem_width = max(len(i['mnemonic']) for i in self.instructions)
         cycles = range(2,6)
@@ -75,25 +83,33 @@ class Microcode:
 
         print(" op  {} f:xzc  {}".format(''.ljust(mnem_width),'   '.join(('T'+str(i)).ljust(code_width) for i in cycles)))
 
-        for instr in sorted(self.instructions, key=lambda k:k['opcode']):
-            opcode = instr['opcode']
-            mnemonic = instr['mnemonic']
-            micro_ops = instr['micro_ops']
-
-            if 'cf_micro_ops' in instr:
-                cf_ops = instr['cf_micro_ops']
-                print(' {:02x}  {}   {}  {}'.format(opcode, mnemonic.ljust(mnem_width), '**0', self._format_micro_ops(micro_ops, include_fetch_cycles)))
-                print('              {}  {}'.format('**1', self._format_micro_ops(cf_ops, include_fetch_cycles)))
-            elif 'zf_micro_ops' in instr:
-                zf_ops = instr['zf_micro_ops']
-                print(' {:02x}  {}   {}  {}'.format(opcode, mnemonic.ljust(mnem_width), '*0*', self._format_micro_ops(micro_ops, include_fetch_cycles)))
-                print('              {}  {}'.format('*1*', self._format_micro_ops(zf_ops, include_fetch_cycles)))
-            elif 'nf_micro_ops' in instr:
-                nf_ops = instr['nf_micro_ops']
-                print(' {:02x}  {}   {}  {}'.format(opcode, mnemonic.ljust(mnem_width), '0**', self._format_micro_ops(micro_ops, include_fetch_cycles)))
-                print('              {}  {}'.format('1**', self._format_micro_ops(nf_ops, include_fetch_cycles)))
+        for opcode in range(1<<5):
+            matches = [i for i in self.instructions if i['opcode']==opcode]
+            if len(matches) > 0:
+                instr = matches[0]
+            elif print_default and self.default_instruction:
+                instr = self.default_instruction
             else:
-                print(' {:02x}  {}   {}  {}'.format(opcode, mnemonic.ljust(mnem_width), '***', self._format_micro_ops(micro_ops, include_fetch_cycles)))
+                instr = None
+
+            if instr:
+                mnemonic = instr['mnemonic']
+                uops = instr['uops']
+
+                if 'cf_uops' in instr:
+                    cf_uops = instr['cf_uops']
+                    print(' {:02x}  {}   {}  {}'.format(opcode, mnemonic.ljust(mnem_width), '**0', self._format_uops(uops, include_fetch_cycles)))
+                    print('              {}  {}'.format('**1', self._format_uops(cf_uops, include_fetch_cycles)))
+                elif 'zf_uops' in instr:
+                    zf_uops = instr['zf_uops']
+                    print(' {:02x}  {}   {}  {}'.format(opcode, mnemonic.ljust(mnem_width), '*0*', self._format_uops(uops, include_fetch_cycles)))
+                    print('              {}  {}'.format('*1*', self._format_uops(zf_uops, include_fetch_cycles)))
+                elif 'nf_uops' in instr:
+                    nf_uops = instr['nf_uops']
+                    print(' {:02x}  {}   {}  {}'.format(opcode, mnemonic.ljust(mnem_width), '0**', self._format_uops(uops, include_fetch_cycles)))
+                    print('              {}  {}'.format('1**', self._format_uops(nf_uops, include_fetch_cycles)))
+                else:
+                    print(' {:02x}  {}   {}  {}'.format(opcode, mnemonic.ljust(mnem_width), '***', self._format_uops(uops, include_fetch_cycles)))
 
     def print_isatable(self):
         code_width = len(format_code(0))
@@ -117,22 +133,37 @@ class Microcode:
     def get_bytes(self):
         eeprom_size = 2048
         blob = eeprom_size*[0]
+
+        if self.default_instruction:
+            instr = self.default_instruction
+            for opcode in range(1 << 5):
+                for flags in range(8):
+                    addr = (opcode << 3 ) | (flags << 8)
+                    uops = instr['uops']
+                    if flags & 1 and 'cf_uops' in instr:
+                        uops = instr['cf_uops']
+                    elif flags & 2 and 'zf_uops' in instr:
+                        uops = instr['zf_uops']
+                    elif flags & 4 and 'nf_uops' in instr:
+                        uops = instr['nf_uops']
+
+                    uops = self.fetch_cycles+uops
+                    blob[addr:(addr+len(uops))] = uops
+
         for instr in self.instructions:
             for flags in range(8):
                 addr = (instr['opcode'] << 3 ) | (flags << 8)
-                micro_ops = instr['micro_ops']
-                if flags & 1 and 'cf_micro_ops' in instr:
-                    micro_ops = instr['cf_micro_ops']
-                elif flags & 2 and 'zf_micro_ops' in instr:
-                    micro_ops = instr['zf_micro_ops']
-                elif flags & 4 and 'nf_micro_ops' in instr:
-                    micro_ops = instr['nf_micro_ops']
+                uops = instr['uops']
+                if flags & 1 and 'cf_uops' in instr:
+                    uops = instr['cf_uops']
+                elif flags & 2 and 'zf_uops' in instr:
+                    uops = instr['zf_uops']
+                elif flags & 4 and 'nf_uops' in instr:
+                    uops = instr['nf_uops']
 
-                micro_ops = self.fetch_cycles+micro_ops
-                blob[addr:(addr+len(micro_ops))] = micro_ops
+                uops = self.fetch_cycles+uops
+                blob[addr:(addr+len(uops))] = uops
         return blob
-
-
 
 
 if __name__ == '__main__':
@@ -152,31 +183,33 @@ if __name__ == '__main__':
     microcode.push(0x02, 'LDB(c)', [     IMO|BRI,           MIE,             0,      0])
     microcode.push(0x03, 'LDA(i)', [     PCO|MAI,   MDO|ARI|PCE,           MIE,      0])
     microcode.push(0x04, 'LDB(i)', [     PCO|MAI,   MDO|BRI|PCE,           MIE,      0])
-    microcode.push(0x05, 'LDA(a)', [     PCO|MAI,   MDO|MAI|PCE,   MDO|ARI|PCE,    MIE])
-    microcode.push(0x06, 'LDB(a)', [     PCO|MAI,   MDO|MAI|PCE,   MDO|BRI|PCE,    MIE])
+    microcode.push(0x05, 'LDA(a)', [     PCO|MAI,   MDO|MAI|PCE,       MDO|ARI,    MIE])
+    microcode.push(0x06, 'LDB(a)', [     PCO|MAI,   MDO|MAI|PCE,       MDO|BRI,    MIE])
 
     # STA                                     T2             T3             T4      T5
-    microcode.push(0x07, 'STA(a)', [     PCO|MAI,   MDO|MAI|PCE,   MDI|ARO|PCE,    MIE])
+    microcode.push(0x07, 'STA(c)', [     IMO|MAI,       MDI|ARO,           MIE,      0])
+    microcode.push(0x08, 'STA(i)', [     PCO|MAI,   MDO|MAI|PCE,       MDI|ARO,    MIE])
 
     # ADD, SUB                                T2             T3             T4      T5
-    microcode.push(0x08, 'ADD',    [     ARI|ALU,           MIE,             0,      0])
-    microcode.push(0x09, 'SUB',    [ ARI|ALU|SUB,           MIE,             0,      0])
+    microcode.push(0x09, 'ADD',    [     ARI|ALU,           MIE,             0,      0])
+    microcode.push(0x0a, 'SUB',    [ ARI|ALU|SUB,           MIE,             0,      0])
 
     # OUTPUT                                  T2             T3             T4      T5
-    microcode.push(0x0a, 'OUT',    [     ARO|OUT,           MIE,             0,      0])
+    microcode.push(0x0b, 'OUT',    [     ARO|OUT,           MIE,             0,      0])
 
     # JUMP, BRANCH                            T2             T3             T4      T5
-    microcode.push(0x0b, 'JMP(c)', [     IMO|PCI,           MIE,             0,      0]) #                   T2             T3             T4      T5
-    microcode.push(0x0c, 'JMP(i)', [     PCO|MAI,       MDO|PCI,           MIE,      0]) #                   T2             T3             T4      T5
-    microcode.push(0x0d, 'BRC(c)', [           0,           MIE,             0,      0], cf_ops = [     IMO|PCI,           MIE,             0,      0])
-    microcode.push(0x0e, 'BRC(i)', [           0,           MIE,             0,      0], cf_ops = [     PCO|MAI,       MDO|PCI,           MIE,      0])
-    microcode.push(0x0f, 'BRZ(c)', [           0,           MIE,             0,      0], zf_ops = [     IMO|PCI,           MIE,             0,      0])
-    microcode.push(0x10, 'BRZ(i)', [           0,           MIE,             0,      0], zf_ops = [     PCO|MAI,       MDO|PCI,           MIE,      0])
-    microcode.push(0x11, 'BRN(c)', [           0,           MIE,             0,      0], nf_ops = [     IMO|PCI,           MIE,             0,      0])
-    microcode.push(0x12, 'BRN(i)', [           0,           MIE,             0,      0], nf_ops = [     PCO|MAI,       MDO|PCI,           MIE,      0])
+    microcode.push(0x0c, 'JMP(c)', [     IMO|PCI,           MIE,             0,      0]) #                   T2             T3             T4      T5
+    microcode.push(0x0d, 'JMP(i)', [     PCO|MAI,       MDO|PCI,           MIE,      0]) #                   T2             T3             T4      T5
+    microcode.push(0x0e, 'BRC(c)', [           0,           MIE,             0,      0], cf_uops = [    IMO|PCI,           MIE,             0,      0])
+    microcode.push(0x0f, 'BRC(i)', [           0,           MIE,             0,      0], cf_uops = [    PCO|MAI,       MDO|PCI,           MIE,      0])
+    microcode.push(0x10, 'BRZ(c)', [           0,           MIE,             0,      0], zf_uops = [    IMO|PCI,           MIE,             0,      0])
+    microcode.push(0x11, 'BRZ(i)', [           0,           MIE,             0,      0], zf_uops = [    PCO|MAI,       MDO|PCI,           MIE,      0])
+    microcode.push(0x12, 'BRN(c)', [           0,           MIE,             0,      0], nf_uops = [    IMO|PCI,           MIE,             0,      0])
+    microcode.push(0x13, 'BRN(i)', [           0,           MIE,             0,      0], nf_uops = [    PCO|MAI,       MDO|PCI,           MIE,      0])
 
     # HLT                                     T2             T3             T4      T5
     microcode.push(0x1f, 'HLT',    [         HLT,             0,             0,      0])
+    microcode.set_default('HLT',   [         HLT,             0,             0,      0])
 
 
     parser = argparse.ArgumentParser(description='8-bit computer microcode generator')
@@ -189,7 +222,7 @@ if __name__ == '__main__':
         microcode.print_isatable()
 
     elif args.mode == 'uctable':
-        microcode.print_uctable()
+        microcode.print_uctable(print_default=True)
 
     elif args.mode == 'low':
         microcode_low  = [c & 0xff for c in mc_blob]
